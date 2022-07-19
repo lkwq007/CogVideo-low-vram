@@ -14,13 +14,10 @@ import sys
 import torch
 import argparse
 import time
-from torchvision.utils import save_image
 import stat
-from icetk import icetk as tokenizer
 import logging, sys
 
 import torch.distributed as dist
-tokenizer.add_special_tokens(['<start_of_image>', '<start_of_english>', '<start_of_chinese>'])
 
 
 from SwissArmyTransformer import get_args
@@ -31,6 +28,11 @@ from SwissArmyTransformer.resources import auto_create
 
 from models.cogvideo_cache_model import CogVideoCacheModel
 from coglm_strategy import CoglmStrategy
+from icetk import icetk as tokenizer
+tokenizer.add_special_tokens(['<start_of_image>', '<start_of_english>', '<start_of_chinese>'])
+
+from torchvision.utils import save_image
+
 
 
 def get_masks_and_position_ids_stage1(data, textlen, framelen):
