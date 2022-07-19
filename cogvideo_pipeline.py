@@ -435,7 +435,7 @@ def main(args):
         model_stage2.eval()
         if args.both_stages:
             model_stage2 = model_stage2.cpu()
-    
+    torch.cuda.empty_cache()
     invalid_slices = [slice(tokenizer.num_image_tokens, None)]
     strategy_cogview2 = CoglmStrategy(invalid_slices, 
         temperature=1.0, top_k=16)
@@ -446,7 +446,7 @@ def main(args):
         from sr_pipeline import DirectSuperResolution 
         dsr_path = auto_create('cogview2-dsr', path=None) # path=os.getenv('SAT_HOME', '~/.sat_models')
         dsr = DirectSuperResolution(args, dsr_path,
-                                    max_bz=12, onCUDA=False)
+                                    max_bz=args.dsr_max_batch_size, onCUDA=False)
     
     def process_stage2(model, seq_text, duration, video_raw_text=None, video_guidance_text="视频", parent_given_tokens=None, conddir=None, outputdir=None, gpu_rank=0, gpu_parallel_size=1):
         stage2_starttime = time.time()
@@ -565,7 +565,6 @@ def main(args):
         frame_num_per_sample = parent_given_tokens.shape[1]
         parent_given_tokens_2d = parent_given_tokens.reshape(-1, 400)
         text_seq = torch.cuda.LongTensor(enc_text, device=args.device).unsqueeze(0).repeat(parent_given_tokens_2d.shape[0], 1)
-        model.cpu()
         sred_tokens = dsr(text_seq, parent_given_tokens_2d)
         decoded_sr_videos = []
         
@@ -736,15 +735,10 @@ def main(args):
                 
             try:
                 path = os.path.join(args.output_path, f"{now_qi}_{raw_text}")
-                if args.both_stages:
-                    model_stage2.cpu()
-                    # model_stage1.cuda()
                 parent_given_tokens = process_stage1(model_stage1, raw_text, duration=4.0, video_raw_text=raw_text, video_guidance_text="视频",
                                                      image_text_suffix=" 高清摄影",
                                                      outputdir=path if args.stage_1 else None, batch_size=args.batch_size)
                 if args.both_stages:
-                    model_stage1.cpu()
-                    # model_stage2.cuda()
                     process_stage2(model_stage2, raw_text, duration=2.0, video_raw_text=raw_text+" 视频", 
                             video_guidance_text="视频", parent_given_tokens=parent_given_tokens, 
                             outputdir=path,
@@ -774,6 +768,7 @@ if __name__ == "__main__":
     
     py_parser = argparse.ArgumentParser(add_help=False)
     py_parser.add_argument('--generate-frame-num', type=int, default=5)
+    py_parser.add_argument('--dsr-max-batch-size', type=int, default=8)
     py_parser.add_argument('--coglm-temperature2', type=float, default=0.89)
     # py_parser.add_argument("--interp-duration", type=float, default=-1) # -1是顺序生成，0是超分，0.5/1/2是插帧
     # py_parser.add_argument("--total-duration", type=float, default=4.0) # 整个的时间
