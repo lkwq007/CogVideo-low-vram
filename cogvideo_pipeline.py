@@ -563,6 +563,7 @@ def main(args):
         frame_num_per_sample = parent_given_tokens.shape[1]
         parent_given_tokens_2d = parent_given_tokens.reshape(-1, 400)
         text_seq = torch.cuda.LongTensor(enc_text, device=args.device).unsqueeze(0).repeat(parent_given_tokens_2d.shape[0], 1)
+        model.cpu()
         sred_tokens = dsr(text_seq, parent_given_tokens_2d)
         decoded_sr_videos = []
         
@@ -733,10 +734,15 @@ def main(args):
                 
             try:
                 path = os.path.join(args.output_path, f"{now_qi}_{raw_text}")
+                if args.both_stages:
+                    model_stage2.cpu()
+                    # model_stage1.cuda()
                 parent_given_tokens = process_stage1(model_stage1, raw_text, duration=4.0, video_raw_text=raw_text, video_guidance_text="视频",
                                                      image_text_suffix=" 高清摄影",
                                                      outputdir=path if args.stage_1 else None, batch_size=args.batch_size)
                 if args.both_stages:
+                    model_stage1.cpu()
+                    # model_stage2.cuda()
                     process_stage2(model_stage2, raw_text, duration=2.0, video_raw_text=raw_text+" 视频", 
                             video_guidance_text="视频", parent_given_tokens=parent_given_tokens, 
                             outputdir=path,
@@ -752,7 +758,7 @@ def main(args):
             path = os.path.join(args.output_path, sample, 'Interp')
             parent_given_tokens = torch.load(os.path.join(args.output_path, sample, "frame_tokens.pt"))
             
-            process_stage2(raw_text, duration=2.0, video_raw_text=raw_text+" 视频", 
+            process_stage2(model_stage2, raw_text, duration=2.0, video_raw_text=raw_text+" 视频", 
                             video_guidance_text="视频", parent_given_tokens=parent_given_tokens, 
                             outputdir=path,
                             gpu_rank=0, gpu_parallel_size=1) # TODO: 修改
