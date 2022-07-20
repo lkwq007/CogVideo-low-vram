@@ -2,11 +2,10 @@
 
 Tweak for GPUs with 24G vRAM. 
 
-A cat is drinking coffee: 
-![cat-chess](./assets/output_1.gif)
 
-A cat is playing chess: 
-![cat-chess](./assets/output_1.gif)
+A cat is drinking coffee   |  A cat is playing chess
+:-------------------------:|:-------------------------:
+![](./assets/output_0.gif)  |  ![](./assets/output_1.gif)
 
 ## CogVideo
 
