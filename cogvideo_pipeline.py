@@ -205,7 +205,7 @@ def my_filling_sequence(
     mems_indexs = [0, 0]
     # mems_len = mem_dict["len"]
     mems_len = [(400+74) if limited_spatial_channel_mem else 5*400+74, 5*400+74]
-    if args.args.keep_mem_buffers:
+    if args.keep_mem_buffers:
         mems_buffers = mem_dict["buffer"]
         for idx, mem_buffer in enumerate(mems_buffers):
             mems_buffers[idx] *= 0
