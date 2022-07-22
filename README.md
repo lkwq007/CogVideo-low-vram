@@ -2,7 +2,7 @@
 
 Tweak for GPUs with 24G vRAM. 
 
-Tested with RTX3090. 
+Tested with RTX3090 with `--max-inference-batch-size=1`
 
 A cat drinking coffee   |  A cat playing chess
 :-------------------------:|:-------------------------:
