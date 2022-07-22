@@ -2,8 +2,9 @@
 
 Tweak for GPUs with 24G vRAM. 
 
+Tested with RTX3090. 
 
-A cat is drinking coffee   |  A cat is playing chess
+A cat drinking coffee   |  A cat playing chess
 :-------------------------:|:-------------------------:
 ![](./assets/output_0.gif)  |  ![](./assets/output_1.gif)
 

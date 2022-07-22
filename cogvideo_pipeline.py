@@ -137,6 +137,8 @@ def calc_next_tokens_frame_begin_id(text_len, frame_len, total_len):
         return None
     return (total_len-text_len)//frame_len * frame_len + text_len
 
+mem_dict={"len":None, "buffer":None, "guider_buffer":None}
+
 def my_filling_sequence(
         model, 
         args,
@@ -201,18 +203,29 @@ def my_filling_sequence(
     index = 0 # Next forward starting index, also the length of cache.
     mems_buffers_on_GPU = False
     mems_indexs = [0, 0]
+    # mems_len = mem_dict["len"]
     mems_len = [(400+74) if limited_spatial_channel_mem else 5*400+74, 5*400+74]
-    mems_buffers = [torch.zeros(args.num_layers, batch_size, mem_len, args.hidden_size*2, dtype=next(model.parameters()).dtype)
+    if args.args.keep_mem_buffers:
+        mems_buffers = mem_dict["buffer"]
+        for idx, mem_buffer in enumerate(mems_buffers):
+            mems_buffers[idx] *= 0
+    else:
+        mems_buffers = [torch.zeros(args.num_layers, batch_size, mem_len, args.hidden_size*2, dtype=next(model.parameters()).dtype)
                         for mem_len in mems_len]
 
     
     if guider_seq is not None: 
         guider_attention_mask = guider_attention_mask.type_as(next(model.parameters())) # if fp16
-        guider_mems_buffers = [torch.zeros(args.num_layers, batch_size, mem_len, args.hidden_size*2, dtype=next(model.parameters()).dtype)
+        if args.keep_mem_buffers:
+            guider_mems_buffers = mem_dict["guider_buffer"]
+            for idx, guider_mem_buffer in enumerate(guider_mems_buffers):
+                guider_mems_buffers[idx] *=0
+        else:
+            guider_mems_buffers = [torch.zeros(args.num_layers, batch_size, mem_len, args.hidden_size*2, dtype=next(model.parameters()).dtype)
                         for mem_len in mems_len]
         guider_mems_indexs = [0, 0]
         guider_mems = None
-    
+
     torch.cuda.empty_cache()
     # step-by-step generation
     while counter < len(seq[0]) - 1:
@@ -295,6 +308,7 @@ def my_filling_sequence(
                     if guider_seq is not None:
                         for idx, mem in enumerate(guider_mems):
                             guider_mems[idx] = mem.to(next(model.parameters()).device) 
+                    pass
                 else: 
                     torch.cuda.empty_cache()
                     for idx, mem_buffer in enumerate(mems_buffers):
@@ -557,7 +571,9 @@ def main(args):
         # my_save_multiple_images(imgs, output_dir_full_path,subdir="frames", debug=False)
         # torch.save(output_tokens_merge.cpu(), os.path.join(output_dir_full_path, 'frame_token.pt'))
         # os.system(f"gifmaker -i '{output_dir_full_path}'/frames/0*.jpg -o '{output_dir_full_path}/{str(float(duration))}_concat.gif' -d 0.2")
-        
+        if args.keep_mem_buffers:
+            del mem_dict["guider_buffer"]
+            del mem_dict["buffer"]
         # direct super-resolution by CogView2
         logging.info("[Direct super-resolution]")
         dsr_starttime = time.time()
@@ -701,7 +717,24 @@ def main(args):
         return save_tokens
                
     # ======================================================================================================
-    
+    if args.keep_mem_buffers:
+        torch.cuda.empty_cache()
+        limited_spatial_channel_mem = True
+        tweak_mems_len = [(400+74) if limited_spatial_channel_mem else 5*400+74, 5*400+74]
+        device = torch.device("cuda")
+        tweak_mems_buffers = [torch.zeros(args.num_layers, args.batch_size, mem_len, args.hidden_size*2, dtype=next(model_stage1.parameters()).dtype, device=device)
+                            for mem_len in tweak_mems_len]
+        mem_dict["buffer"]=tweak_mems_buffers
+
+        if args.use_guidance_stage1:
+            # guider_attention_mask = guider_attention_mask.type_as(next(model_stage1.parameters())) # if fp16
+            tweak_guider_mems_buffers = [torch.zeros(args.num_layers, args.batch_size, mem_len, args.hidden_size*2, dtype=next(model_stage1.parameters()).dtype, device=device)
+                            for mem_len in tweak_mems_len]
+            tweak_guider_mems_indexs = [0, 0]
+            tweak_guider_mems = None
+            mem_dict["guider_buffer"]=tweak_guider_mems_buffers
+        # for idx, guider_mem_buffer in enumerate(guider_mems_buffers):
+            # guider_mems_buffers[idx] = guider_mem_buffer.to(next(model.parameters()).device)
     if args.stage_1 or args.both_stages:
         if args.input_source != "interactive":
             with open(args.input_source, 'r') as fin:
@@ -768,7 +801,8 @@ if __name__ == "__main__":
     
     py_parser = argparse.ArgumentParser(add_help=False)
     py_parser.add_argument('--generate-frame-num', type=int, default=5)
-    py_parser.add_argument('--dsr-max-batch-size', type=int, default=8)
+    py_parser.add_argument('--dsr-max-batch-size', type=int, default=4)
+    py_parser.add_argument('--keep-mem-buffers', action='store_true')
     py_parser.add_argument('--coglm-temperature2', type=float, default=0.89)
     # py_parser.add_argument("--interp-duration", type=float, default=-1) # -1是顺序生成，0是超分，0.5/1/2是插帧
     # py_parser.add_argument("--total-duration", type=float, default=4.0) # 整个的时间
